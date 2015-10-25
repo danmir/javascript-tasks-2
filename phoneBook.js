@@ -1,5 +1,10 @@
 'use strict';
 
+/**
+ * Добавление функции repeat для повторения строк
+ * @param num - кол раз
+ * @returns {string}
+ */
 String.prototype.repeat = function (num) {
     return new Array(isNaN(num) ? 1 : ++num).join(this);
 };
@@ -18,7 +23,7 @@ function cleanName(email) {
             return String(this).replace(/^\s+|\s+$/g, '');
         };
     }
-    return email.toLowerCase().trim();
+    return email.trim();
 }
 
 /**
@@ -28,7 +33,17 @@ function cleanName(email) {
  */
 function cleanPhone(phone) {
     phone = phone.replace(/\s+/g, '').replace(/\-+/g, '');
-    return phone.replace(/\++/g, '').replace(/\(+/g, '').replace(/\)+/g, '');
+    return phone.replace(/\++|\(+|\)+/g, '');
+}
+
+function isValidEmail(email) {
+    var emailRe = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i;
+    return emailRe.test(email);
+}
+
+function isValidPhone(phone) {
+    var phoneRe = /^\+?\d*?[- ]?(\({1}\d{3}\){1}|\d{3})[- ]?\d{3}[- ]?\d?[- ]?\d{3}$/;
+    return phoneRe.test(phone);
 }
 
 /**
@@ -39,18 +54,16 @@ function cleanPhone(phone) {
  * @returns {*} Результат операции
  */
 module.exports.add = function add(name, phone, email) {
-    var emailRe = /^(([^<>()[\]\.,;:\s@\"]+(\.[^<>()[\]\.,;:\s@\"]+)*)|(\".+\"))@(([^<>()[\]\.,;:\s@\"]+\.)+[^<>()[\]\.,;:\s@\"]{2,})$/i;
-    var phoneRe = /^\+?\d*?[- ]?(\({1}\d{3}\){1}|\d{3})[- ]?\d{3}[- ]?\d?[- ]?\d{3}$/;
-    var cleanedEamil = cleanName(email);
-    var toAdd = {name: name, phone: phone, clean_phone: cleanPhone(phone), email: cleanedEamil};
-    if (emailRe.test(email) && phoneRe.test(phone)) {
+    var cleanedEmail = cleanName(email);
+    var toAddSnippet = {name: name, phone: phone, clean_phone: cleanPhone(phone), email: cleanedEmail};
+    if (isValidEmail(email) && isValidPhone(phone)) {
         /* Раз в примере у людей повторяются email (что старнно),
          то за ключ в словаре берем и email и имя
          */
-        phoneBook[[cleanedEamil, name].join('_')] = toAdd;
-        return {status: 200, descr: 'added', data: toAdd};
+        phoneBook[[cleanedEmail, name].join('_')] = toAddSnippet;
+        return {status: 201, descr: 'added', data: toAddSnippet};
     } else {
-        return {status: 500, descr: 'error with data validation', data: toAdd};
+        return {status: 400, descr: 'error with data validation', data: toAddSnippet};
     }
 };
 
@@ -59,18 +72,16 @@ module.exports.add = function add(name, phone, email) {
  * @param query
  * @returns {{}} часть объекта phoneBook
  */
-var search = function (query) {
-    var pbKeys = Object.keys(phoneBook);
+function search (query) {
     var searchResult = {};
     for (var pbKey in phoneBook) {
         if (phoneBook.hasOwnProperty(pbKey)) {
             var toSearchIn = '';
             var toSearchInDict = phoneBook[pbKey];
-            var toSearchInKeys = Object.keys(toSearchInDict);
             for (var field in toSearchInDict) {
                 toSearchIn = toSearchIn.concat(toSearchInDict[field]);
             }
-            if (toSearchIn.indexOf(query) != -1) {
+            if (toSearchIn.indexOf(query) >= 0) {
                 searchResult[pbKey] = phoneBook[pbKey];
             }
         }
@@ -94,8 +105,8 @@ module.exports.find = function find(query) {
      */
     for (var key in searchResult) {
         console.log([searchResult[key]['name'],
-                     searchResult[key]['phone'],
-                     searchResult[key]['email']].join(', '));
+            searchResult[key]['phone'],
+            searchResult[key]['email']].join(', '));
     }
     return searchResult;
 };
@@ -122,9 +133,9 @@ module.exports.remove = function remove(query) {
  */
 module.exports.importFromCsv = function importFromCsv(filename) {
     var data = require('fs').readFileSync(filename, 'utf-8');
-    data = data.replace(/\n+$/g, '').split('\n');
+    data = data.replace(/\n+$|\r\n+$/g, '').split('\n');
     var addedData = [];
-    data.forEach(function (record, i, data) {
+    data.forEach(function (record) {
         record = record.split(';');
         var resData = module.exports.add(record[0], record[1], record[2]);
         if (resData['status'] == 200) {
@@ -141,7 +152,7 @@ module.exports.importFromCsv = function importFromCsv(filename) {
  * @param key
  * @returns {number}
  */
-var longestValByKey = function (key) {
+function longestValByKey (key) {
     var mLen = 0;
     for (var k in phoneBook) {
         for (var ik in phoneBook[k]) {
